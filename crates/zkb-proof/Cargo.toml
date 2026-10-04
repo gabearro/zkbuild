@@ -1,0 +1,16 @@
+[package]
+name = "zkb-proof"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+zkb-field = { path = "../zkb-field" }
+zkb-stark = { path = "../zkb-stark" }
+zkb-vm = { path = "../zkb-vm" }
+zkb-air = { path = "../zkb-air" }
+zkb-ca = { path = "../zkb-ca" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }

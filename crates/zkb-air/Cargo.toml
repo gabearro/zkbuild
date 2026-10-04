@@ -1,0 +1,16 @@
+[package]
+name = "zkb-air"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+zkb-field = { path = "../zkb-field" }
+zkb-stark = { path = "../zkb-stark" }
+zkb-vm = { path = "../zkb-vm" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }

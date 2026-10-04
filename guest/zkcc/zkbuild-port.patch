@@ -1,0 +1,207 @@
+Only in chibicc: ZKBUILD-NOTES
+diff -ru /tmp/chibicc-orig2/chibicc.h chibicc/chibicc.h
+--- /tmp/chibicc-orig2/chibicc.h	2026-10-03 10:54:16.755233275 -0700
++++ chibicc/chibicc.h	2026-10-03 10:56:35.708749224 -0700
+@@ -75,7 +75,7 @@
+   TokenKind kind;   // Token kind
+   Token *next;      // Next token
+   int64_t val;      // If kind is TK_NUM, its value
+-  long double fval; // If kind is TK_NUM, its value
++  double fval; // If kind is TK_NUM, its value  [zkbuild: double; the host has no 80-bit type]
+   char *loc;        // Token location
+   int len;          // Token length
+   Type *ty;         // Used if TK_NUM or TK_STR
+@@ -169,7 +169,7 @@
+   Relocation *next;
+   int offset;
+   char **label;
+-  long addend;
++  long long addend;
+ };
+ 
+ // AST node
+@@ -267,8 +267,8 @@
+   Node *default_case;
+ 
+   // Case
+-  long begin;
+-  long end;
++  long long begin;
++  long long end;
+ 
+   // "asm" string literal
+   char *asm_str;
+@@ -287,7 +287,7 @@
+ 
+   // Numeric literal
+   int64_t val;
+-  long double fval;
++  double fval;
+ };
+ 
+ Node *new_cast(Node *expr, Type *ty);
+diff -ru /tmp/chibicc-orig2/codegen.c chibicc/codegen.c
+--- /tmp/chibicc-orig2/codegen.c	2026-10-03 10:54:16.755271386 -0700
++++ chibicc/codegen.c	2026-10-03 10:56:55.085372701 -0700
+@@ -699,30 +699,45 @@
+     switch (node->ty->kind) {
+     case TY_FLOAT: {
+       union { float f32; uint32_t u32; } u = { node->fval };
+-      println("  mov $%u, %%eax  # float %Lf", u.u32, node->fval);
++      println("  mov $%u, %%eax  # float %f", u.u32, node->fval);
+       println("  movq %%rax, %%xmm0");
+       return;
+     }
+     case TY_DOUBLE: {
+       union { double f64; uint64_t u64; } u = { node->fval };
+-      println("  mov $%lu, %%rax  # double %Lf", u.u64, node->fval);
++      println("  mov $%llu, %%rax  # double %f", (unsigned long long)u.u64, node->fval);
+       println("  movq %%rax, %%xmm0");
+       return;
+     }
+     case TY_LDOUBLE: {
+-      union { long double f80; uint64_t u64[2]; } u;
++      // [zkbuild] build the x87 80-bit extended representation from the double
++      union { uint64_t u64[2]; } u;
+       memset(&u, 0, sizeof(u));
+-      u.f80 = node->fval;
+-      println("  mov $%lu, %%rax  # long double %Lf", u.u64[0], node->fval);
++      {
++        union { double d; uint64_t bits; } dv = { node->fval };
++        uint64_t sign = dv.bits >> 63;
++        int exp = (int)((dv.bits >> 52) & 0x7ff);
++        uint64_t mant = dv.bits & ((1ULL << 52) - 1);
++        if (exp == 0 && mant == 0) {
++          u.u64[0] = 0; u.u64[1] = sign << 15;
++        } else if (exp == 0x7ff) {
++          u.u64[0] = (1ULL << 63) | (mant << 11); u.u64[1] = (sign << 15) | 0x7fff;
++        } else {
++          if (exp == 0) { while (!(mant & (1ULL << 52))) { mant <<= 1; exp--; } exp++; mant &= (1ULL << 52) - 1; }
++          u.u64[0] = (1ULL << 63) | (mant << 11);
++          u.u64[1] = (sign << 15) | (uint64_t)(exp - 1023 + 16383);
++        }
++      }
++      println("  mov $%llu, %%rax  # long double %f", (unsigned long long)u.u64[0], node->fval);
+       println("  mov %%rax, -16(%%rsp)");
+-      println("  mov $%lu, %%rax", u.u64[1]);
++      println("  mov $%llu, %%rax", (unsigned long long)u.u64[1]);
+       println("  mov %%rax, -8(%%rsp)");
+       println("  fldt -16(%%rsp)");
+       return;
+     }
+     }
+ 
+-    println("  mov $%ld, %%rax", node->val);
++    println("  mov $%lld, %%rax", (long long)node->val);
+     return;
+   }
+   case ND_NEG:
+@@ -785,14 +800,14 @@
+       // from memory and merge it with a new value.
+       Member *mem = node->lhs->member;
+       println("  mov %%rax, %%rdi");
+-      println("  and $%ld, %%rdi", (1L << mem->bit_width) - 1);
++      println("  and $%lld, %%rdi", (1LL << mem->bit_width) - 1);
+       println("  shl $%d, %%rdi", mem->bit_offset);
+ 
+       println("  mov (%%rsp), %%rax");
+       load(mem->ty);
+ 
+-      long mask = ((1L << mem->bit_width) - 1) << mem->bit_offset;
+-      println("  mov $%ld, %%r9", ~mask);
++      long long mask = ((1LL << mem->bit_width) - 1) << mem->bit_offset;
++      println("  mov $%lld, %%r9", ~mask);
+       println("  and %%r9, %%rax");
+       println("  or %%rdi, %%rax");
+       store(node->ty);
+@@ -1239,15 +1254,15 @@
+       char *di = (node->cond->ty->size == 8) ? "%rdi" : "%edi";
+ 
+       if (n->begin == n->end) {
+-        println("  cmp $%ld, %s", n->begin, ax);
++        println("  cmp $%lld, %s", n->begin, ax);
+         println("  je %s", n->label);
+         continue;
+       }
+ 
+       // [GNU] Case ranges
+       println("  mov %s, %s", ax, di);
+-      println("  sub $%ld, %s", n->begin, di);
+-      println("  cmp $%ld, %s", n->end - n->begin, di);
++      println("  sub $%lld, %s", n->begin, di);
++      println("  cmp $%lld, %s", n->end - n->begin, di);
+       println("  jbe %s", n->label);
+     }
+ 
+diff -ru /tmp/chibicc-orig2/parse.c chibicc/parse.c
+--- /tmp/chibicc-orig2/parse.c	2026-10-03 10:54:16.755451240 -0700
++++ chibicc/parse.c	2026-10-03 10:54:16.778186691 -0700
+@@ -222,7 +222,7 @@
+   return node;
+ }
+ 
+-static Node *new_ulong(long val, Token *tok) {
++static Node *new_ulong(long long val, Token *tok) {
+   Node *node = new_node(ND_NUM, tok);
+   node->val = val;
+   node->ty = ty_ulong;
+@@ -1994,7 +1994,7 @@
+ 
+   if (is_integer(node->ty)) {
+     if (node->ty->is_unsigned)
+-      return (unsigned long)eval(node);
++      return (unsigned long long)eval(node);
+     return eval(node);
+   }
+ 
+diff -ru /tmp/chibicc-orig2/preprocess.c chibicc/preprocess.c
+--- /tmp/chibicc-orig2/preprocess.c	2026-10-03 10:54:16.755492199 -0700
++++ chibicc/preprocess.c	2026-10-03 10:54:16.778442139 -0700
+@@ -277,7 +277,7 @@
+ }
+ 
+ // Read and evaluate a constant expression.
+-static long eval_const_expr(Token **rest, Token *tok) {
++static long long eval_const_expr(Token **rest, Token *tok) {
+   Token *start = tok;
+   Token *expr = read_const_expr(rest, tok->next);
+   expr = preprocess2(expr);
+@@ -301,7 +301,7 @@
+   convert_pp_tokens(expr);
+ 
+   Token *rest2;
+-  long val = const_expr(&rest2, expr);
++  long long val = const_expr(&rest2, expr);
+   if (rest2->kind != TK_EOF)
+     error_tok(rest2, "extra token");
+   return val;
+@@ -897,7 +897,7 @@
+     }
+ 
+     if (equal(tok, "if")) {
+-      long val = eval_const_expr(&tok, tok);
++      long long val = eval_const_expr(&tok, tok);
+       push_cond_incl(start, val);
+       if (!val)
+         tok = skip_cond_incl(tok);
+diff -ru /tmp/chibicc-orig2/tokenize.c chibicc/tokenize.c
+--- /tmp/chibicc-orig2/tokenize.c	2026-10-03 10:54:16.755528155 -0700
++++ chibicc/tokenize.c	2026-10-03 11:05:10.886161127 -0700
+@@ -354,7 +354,7 @@
+     base = 8;
+   }
+ 
+-  int64_t val = strtoul(p, &p, base);
++  int64_t val = strtoull(p, &p, base);
+ 
+   // Read U, L or LL suffixes.
+   bool l = false;
+@@ -431,7 +431,7 @@
+ 
+   // If it's not an integer, it must be a floating point constant.
+   char *end;
+-  long double val = strtold(tok->loc, &end);
++  double val = strtod(tok->loc, &end);
+ 
+   Type *ty;
+   if (*end == 'f' || *end == 'F') {

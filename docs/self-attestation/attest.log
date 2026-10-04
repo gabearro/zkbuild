@@ -1,0 +1,19 @@
+libc/libc.c:848:1: warning: function declared 'noreturn' should not return [-Winvalid-noreturn]
+  848 | }
+      | ^
+1 warning generated.
+== toolchain
+tu image     = 129ce156471c96dd1ce82559491e039ef20dd4d2cfc4f80d3ecc278d7423cc0f
+link image   = 22174eb5f54db794358f6a62b8192771cab6d723748aa18250baefe69cc7df4f
+toolchain_root = 7883e1b383f97b56a62f499fa5ed57126ceff9506cddccf01147131ff2ec4867
+== 1. proving every translation unit of chibicc compiled by chibicc inside the zkVM
+   strings.c: 13313548 cycles in 103 segment(s) in 346 s, certificate 57M
+   unicode.c: 22113925 cycles in 171 segment(s) in 580 s, certificate 94M
+   hashmap.c: 22197793 cycles in 172 segment(s) in 625 s, certificate 94M
+   type.c: 24824863 cycles in 192 segment(s) in 655 s, certificate 105M
+   main.c: 48038929 cycles in 371 segment(s) in 1230 s, certificate 203M
+   tokenize.c: 48520096 cycles in 375 segment(s) in 1231 s, certificate 205M
+   codegen.c: 79695606 cycles in 615 segment(s) in 2051 s, certificate 336M
+   preprocess.c: 62678351 cycles in 484 segment(s) in 1608 s, certificate 265M
+   parse.c: 148816906 cycles in 1147 segment(s) in 3749 s, certificate 627M
+./attest-self.sh: line 51: cert | cut -f1): command not found

@@ -1,0 +1,20 @@
+[package]
+name = "zkb-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "zkb"
+path = "src/main.rs"
+
+[dependencies]
+zkb-vm = { path = "../zkb-vm" }
+zkb-air = { path = "../zkb-air" }
+zkb-ca = { path = "../zkb-ca" }
+zkb-stark = { path = "../zkb-stark" }
+zkb-proof = { path = "../zkb-proof" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+mimalloc = { version = "0.1", features = ["extended"] }
+libmimalloc-sys = { version = "0.1", features = ["extended"] }

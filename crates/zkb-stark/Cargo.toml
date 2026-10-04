@@ -1,0 +1,13 @@
+[package]
+name = "zkb-stark"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+zkb-field = { path = "../zkb-field" }
+blake3 = { workspace = true }
+serde = { workspace = true }
+rayon = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }

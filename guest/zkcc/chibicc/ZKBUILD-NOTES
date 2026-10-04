@@ -1,0 +1,9 @@
+Upstream: https://github.com/rui314/chibicc at commit (see COMMIT), MIT license.
+Local changes (../zkbuild-port.patch), all host-portability only:
+  * the few places where chibicc assumes an LP64 host (`long` == 64 bits,
+    `%ld`/`%lu` with int64_t, strtoul for 64-bit literals) use `long long` / `%lld` / strtoull explicitly;
+  * the compiler keeps floating constants in `double` instead of `long double`
+    (RV32 has no 80-bit type; x87 extended constants are synthesized from the
+    double for emission). Long-double literals beyond double precision are the
+    only observable difference from a native build.
+No other modifications.
